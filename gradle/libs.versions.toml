@@ -17,6 +17,7 @@ roomCompiler = "2.8.5"
 navigation3 = "1.1.7"
 lifecycleviewModelNav3 = "2.11.0"
 material3 = "1.5.0-alpha28"
+ezVcard = "0.12.2"
 
 
 
@@ -58,6 +59,7 @@ androidx-lifecycle-viewmodel-nav3 = { module = "androidx.lifecycle:lifecycle-vie
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomCompiler" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomCompiler" }
+ez-vcard = { module = "com.googlecode.ez-vcard:ez-vcard", version.ref = "ezVcard" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -3,7 +3,10 @@ package com.megamind.yanguservice.ui.screen.contacts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamind.yanguservice.domain.model.Contact
+import com.megamind.yanguservice.domain.model.ContactImportResult
 import com.megamind.yanguservice.domain.repo.ContactRepository
+import com.megamind.yanguservice.domain.usecase.ImportVcfContacts
+import com.megamind.yanguservice.domain.utils.normalizeInternationalNumber
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,9 +21,14 @@ data class ContactsUiState(
     val isLoading: Boolean = true,
     val isAddSheetOpen: Boolean = false,
     val isSaving: Boolean = false,
+    val isImporting: Boolean = false,
+    val importResult: ContactImportResult? = null,
 )
 
-class ContactsViewModel(private val repository: ContactRepository) : ViewModel() {
+class ContactsViewModel(
+    private val repository: ContactRepository,
+    private val importVcfContacts: ImportVcfContacts,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(ContactsUiState())
     val uiState = _uiState.asStateFlow()
 
@@ -42,6 +50,7 @@ class ContactsViewModel(private val repository: ContactRepository) : ViewModel()
     }
 
     fun openAddSheet() {
+        if (_uiState.value.isImporting) return
         _uiState.update { it.copy(isAddSheetOpen = true, error = null) }
     }
 
@@ -54,19 +63,38 @@ class ContactsViewModel(private val repository: ContactRepository) : ViewModel()
         if (_uiState.value.isSaving) return
 
         val cleanName = name.trim()
-        val cleanPhoneNumber = phoneNumber.filterNot(Char::isWhitespace).trim()
-        val error = when {
-            cleanName.isEmpty() -> "Saisissez un nom"
-            !PHONE_NUMBER_PATTERN.matches(cleanPhoneNumber) ->
-                "Saisissez un numéro international valide, par exemple +33612345678"
-            else -> null
+        if (cleanName.isEmpty()) {
+            _uiState.update { it.copy(error = "Saisissez un nom") }
+            return
         }
-        if (error != null) {
-            _uiState.update { it.copy(error = error) }
+        val cleanPhoneNumber = normalizeInternationalNumber(phoneNumber) ?: run {
+            _uiState.update {
+                it.copy(error = "Saisissez un numéro international valide, par exemple +33612345678")
+            }
             return
         }
 
         saveContact(Contact(UUID.randomUUID().toString(), cleanName, cleanPhoneNumber))
+    }
+
+    fun importVcf(uri: String) {
+        if (_uiState.value.isImporting || _uiState.value.isSaving) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImporting = true, importResult = null, error = null) }
+            try {
+                val result = importVcfContacts(uri)
+                _uiState.update { it.copy(isImporting = false, importResult = result) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isImporting = false,
+                        error = error.message ?: "Impossible d'importer le fichier VCF",
+                    )
+                }
+            }
+        }
     }
 
     fun saveContact(contact: Contact) = viewModelScope.launch {
@@ -103,7 +131,4 @@ class ContactsViewModel(private val repository: ContactRepository) : ViewModel()
         _uiState.update { it.copy(error = null) }
     }
 
-    private companion object {
-        val PHONE_NUMBER_PATTERN = Regex("^\\+[1-9]\\d{7,14}$")
-    }
 }

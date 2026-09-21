@@ -1,5 +1,7 @@
 package com.megamind.yanguservice.ui.screen.contacts
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +51,9 @@ fun ContactScreen(
     viewModel: ContactsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val vcfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.importVcf(it.toString()) }
+    }
 
     ContactScreenContent(
         uiState = uiState,
@@ -56,6 +61,19 @@ fun ContactScreen(
         onOpenAddSheet = viewModel::openAddSheet,
         onDismissAddSheet = viewModel::dismissAddSheet,
         onAddContact = viewModel::addContact,
+        onPickVcf = {
+            vcfPicker.launch(
+                arrayOf(
+                    "text/vcard",
+                    "text/x-vcard",
+                    "text/directory",
+                    "application/vcard",
+                    "application/x-vcard",
+                    "text/plain",
+                    "application/octet-stream",
+                )
+            )
+        },
         onClearError = viewModel::clearError,
         modifier = modifier,
     )
@@ -69,6 +87,7 @@ fun ContactScreenContent(
     onOpenAddSheet: () -> Unit,
     onDismissAddSheet: () -> Unit,
     onAddContact: (name: String, phoneNumber: String) -> Unit,
+    onPickVcf: () -> Unit,
     onClearError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -80,15 +99,30 @@ fun ContactScreenContent(
             Text("Retour")
         }
 
+        Text("Contacts", style = MaterialTheme.typography.headlineSmall)
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Contacts", style = MaterialTheme.typography.headlineSmall)
-            Button(onClick = onOpenAddSheet) {
+            OutlinedButton(onClick = onPickVcf, enabled = !uiState.isImporting) {
+                if (uiState.isImporting) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Importer .vcf")
+                }
+            }
+            Button(onClick = onOpenAddSheet, enabled = !uiState.isImporting) {
                 Text("Ajouter")
             }
+        }
+
+        uiState.importResult?.let { result ->
+            Text(
+                "${result.imported} contact(s) importé(s), ${result.skipped} entrée(s) ignorée(s)",
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
 
         if (!uiState.isAddSheetOpen) {
@@ -228,6 +262,7 @@ private fun ContactScreenPreview() {
             onOpenAddSheet = {},
             onDismissAddSheet = {},
             onAddContact = { _, _ -> },
+            onPickVcf = {},
             onClearError = {},
         )
     }
