@@ -1,4 +1,4 @@
-package com.megamind.yanguservice.domain
+package com.megamind.yanguservice.domain.utils
 
 import com.megamind.yanguservice.utlis.Result
 

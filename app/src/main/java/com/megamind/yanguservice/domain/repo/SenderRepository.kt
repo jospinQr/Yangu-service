@@ -1,7 +1,9 @@
-package com.megamind.yanguservice.domain
+package com.megamind.yanguservice.domain.repo
 
+import com.megamind.yanguservice.domain.utils.ImageAttachment
 import com.megamind.yanguservice.utlis.BulkSendResult
 import com.megamind.yanguservice.utlis.Result
+
 interface SenderRepository {
 
     suspend fun sendMessage(message: String, phoneNumber: String): Result<String>

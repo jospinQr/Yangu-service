@@ -1,15 +1,15 @@
-package com.megamind.yanguservice.data.local
+package com.megamind.yanguservice.utlis
 
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import com.megamind.yanguservice.domain.ImageAttachment
-import com.megamind.yanguservice.domain.ImageContentReader
-import com.megamind.yanguservice.utlis.Result
-import java.io.ByteArrayOutputStream
+import androidx.core.net.toUri
+import com.megamind.yanguservice.domain.utils.ImageAttachment
+import com.megamind.yanguservice.domain.utils.ImageContentReader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 
 class AndroidImageContentReader(
     private val context: Context,
@@ -18,7 +18,7 @@ class AndroidImageContentReader(
 
     override suspend fun read(uri: String): Result<ImageAttachment> = withContext(dispatcher) {
         try {
-            val contentUri = Uri.parse(uri)
+            val contentUri = uri.toUri()
             val mimeType = context.contentResolver.getType(contentUri)
                 ?: return@withContext Result.Error(
                     IllegalArgumentException("Impossible de déterminer le type de l'image")

@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,19 +46,23 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SendMessageScreen(
     modifier: Modifier = Modifier,
+    onOpenContacts: () -> Unit = {},
     viewModel: SenderViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(viewModel) {
+        viewModel.refreshApiTokenConfiguration()
+    }
+
     SendMessageScreenContent(
         uiState = uiState,
-        onSaveApiToken = viewModel::saveApiToken,
-        onClearApiToken = viewModel::clearApiToken,
         onImageSelected = viewModel::selectImage,
         onRemoveImage = viewModel::removeImage,
         onSend = viewModel::sendToMany,
         onCancel = viewModel::cancel,
         onClearError = viewModel::clearError,
+        onOpenContacts = onOpenContacts,
         modifier = modifier
     )
 }
@@ -67,13 +70,12 @@ fun SendMessageScreen(
 @Composable
 fun SendMessageScreenContent(
     uiState: SenderUiState,
-    onSaveApiToken: (String) -> Unit,
-    onClearApiToken: () -> Unit,
     onImageSelected: (String) -> Unit,
     onRemoveImage: () -> Unit,
     onSend: (message: String, phoneNumbers: List<String>) -> Unit,
     onCancel: () -> Unit,
     onClearError: () -> Unit,
+    onOpenContacts: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var message by remember { mutableStateOf("") }
@@ -96,12 +98,9 @@ fun SendMessageScreenContent(
             style = MaterialTheme.typography.headlineSmall
         )
 
-        ApiTokenSection(
-            uiState = uiState,
-            onSaveApiToken = onSaveApiToken,
-            onClearApiToken = onClearApiToken,
-            onClearError = onClearError
-        )
+        OutlinedButton(onClick = onOpenContacts) {
+            Text("Voir les contacts")
+        }
 
         OutlinedTextField(
             value = recipients,
@@ -187,68 +186,6 @@ fun SendMessageScreenContent(
 
         uiState.result?.let { result ->
             SendResult(result)
-        }
-    }
-}
-
-@Composable
-private fun ApiTokenSection(
-    uiState: SenderUiState,
-    onSaveApiToken: (String) -> Unit,
-    onClearApiToken: () -> Unit,
-    onClearError: () -> Unit
-) {
-    var token by remember { mutableStateOf("") }
-
-    LaunchedEffect(uiState.isApiTokenConfigured) {
-        if (uiState.isApiTokenConfigured) token = ""
-    }
-
-    if (uiState.isApiTokenConfigured) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Token API configuré et chiffré sur cet appareil",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            OutlinedButton(
-                onClick = onClearApiToken,
-                enabled = !uiState.isSending
-            ) {
-                Text("Remplacer le token")
-            }
-        }
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = token,
-                onValueChange = {
-                    token = it
-                    onClearError()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isSavingToken,
-                label = { Text("Token API Wasender") },
-                supportingText = {
-                    Text("Le token sera chiffré avec Android Keystore")
-                },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                singleLine = true
-            )
-            Button(
-                onClick = { onSaveApiToken(token) },
-                enabled = token.isNotBlank() && !uiState.isSavingToken
-            ) {
-                if (uiState.isSavingToken) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Enregistrer le token")
-                }
-            }
         }
     }
 }
@@ -351,13 +288,12 @@ private fun SendMessageScreenPreview() {
     YanguServiceTheme {
         SendMessageScreenContent(
             uiState = SenderUiState(),
-            onSaveApiToken = {},
-            onClearApiToken = {},
             onImageSelected = {},
             onRemoveImage = {},
             onSend = { _, _ -> },
             onCancel = {},
-            onClearError = {}
+            onClearError = {},
+            onOpenContacts = {}
         )
     }
 }

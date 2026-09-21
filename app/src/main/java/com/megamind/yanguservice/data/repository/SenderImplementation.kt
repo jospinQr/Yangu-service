@@ -2,8 +2,8 @@ package com.megamind.yanguservice.data.repository
 
 import android.util.Log
 import com.megamind.yanguservice.data.remote.WasenderSevice
-import com.megamind.yanguservice.domain.ImageAttachment
-import com.megamind.yanguservice.domain.SenderRepository
+import com.megamind.yanguservice.domain.utils.ImageAttachment
+import com.megamind.yanguservice.domain.repo.SenderRepository
 import com.megamind.yanguservice.utlis.BulkSendResult
 import com.megamind.yanguservice.utlis.Result
 import kotlinx.coroutines.CoroutineDispatcher

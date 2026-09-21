@@ -1,7 +1,7 @@
 package com.megamind.yanguservice.data.remote
 
 import com.megamind.yanguservice.data.remote.utils.safeApiCall
-import com.megamind.yanguservice.domain.ImageAttachment
+import com.megamind.yanguservice.domain.utils.ImageAttachment
 import com.megamind.yanguservice.utlis.Result
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post

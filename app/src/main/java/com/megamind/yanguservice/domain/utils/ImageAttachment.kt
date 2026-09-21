@@ -1,4 +1,4 @@
-package com.megamind.yanguservice.domain
+package com.megamind.yanguservice.domain.utils
 
 data class ImageAttachment(
     val bytes: ByteArray,

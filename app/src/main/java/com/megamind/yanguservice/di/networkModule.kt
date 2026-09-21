@@ -1,7 +1,7 @@
 package com.megamind.yanguservice.di
 
 import com.megamind.yanguservice.data.remote.WasenderSevice
-import com.megamind.yanguservice.domain.AuthTokenStore
+import com.megamind.yanguservice.domain.utils.AuthTokenStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -33,7 +33,7 @@ val networkModule = module {
                 socketTimeoutMillis = 30_000
             }
 
-            configureNetworkLogging()
+
 
             defaultRequest {
                 url("https://www.wasenderapi.com/api/")

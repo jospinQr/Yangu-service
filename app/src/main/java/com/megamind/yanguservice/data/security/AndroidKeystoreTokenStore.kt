@@ -5,7 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
-import com.megamind.yanguservice.domain.AuthTokenStore
+import com.megamind.yanguservice.domain.utils.AuthTokenStore
 import com.megamind.yanguservice.utlis.Result
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore

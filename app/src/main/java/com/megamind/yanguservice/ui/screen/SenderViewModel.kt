@@ -2,10 +2,10 @@ package com.megamind.yanguservice.ui.screen
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.megamind.yanguservice.domain.AuthTokenStore
-import com.megamind.yanguservice.domain.ImageAttachment
-import com.megamind.yanguservice.domain.ImageContentReader
-import com.megamind.yanguservice.domain.SenderRepository
+import com.megamind.yanguservice.domain.utils.AuthTokenStore
+import com.megamind.yanguservice.domain.utils.ImageAttachment
+import com.megamind.yanguservice.domain.utils.ImageContentReader
+import com.megamind.yanguservice.domain.repo.SenderRepository
 import com.megamind.yanguservice.utlis.BulkSendResult
 import com.megamind.yanguservice.utlis.Result
 import kotlinx.coroutines.CancellationException
@@ -17,7 +17,6 @@ import kotlinx.coroutines.launch
 
 data class SenderUiState(
     val isApiTokenConfigured: Boolean = false,
-    val isSavingToken: Boolean = false,
     val isSending: Boolean = false,
     val isImageLoading: Boolean = false,
     val selectedImageUri: String? = null,
@@ -41,50 +40,10 @@ class SenderViewModel(
     private var imageLoadJob: Job? = null
     private var sendJob: Job? = null
 
-    fun saveApiToken(token: String) {
-        if (_uiState.value.isSavingToken || token.isBlank()) {
-            if (token.isBlank()) {
-                _uiState.update { it.copy(error = "Saisissez un token API valide") }
-            }
-            return
-        }
-
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSavingToken = true, error = null) }
-            when (val result = authTokenStore.saveToken(token)) {
-                is Result.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isApiTokenConfigured = true,
-                            isSavingToken = false,
-                            error = null
-                        )
-                    }
-                }
-
-                is Result.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isSavingToken = false,
-                            error = result.e?.message ?: "Impossible d'enregistrer le token API"
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun clearApiToken() {
-        if (_uiState.value.isSending) return
-        viewModelScope.launch {
-            authTokenStore.clearToken()
-            _uiState.update {
-                it.copy(
-                    isApiTokenConfigured = false,
-                    isSavingToken = false,
-                    error = null
-                )
-            }
+    fun refreshApiTokenConfiguration() {
+        val isConfigured = !authTokenStore.getToken().isNullOrBlank()
+        if (_uiState.value.isApiTokenConfigured != isConfigured) {
+            _uiState.update { it.copy(isApiTokenConfigured = isConfigured) }
         }
     }
 
