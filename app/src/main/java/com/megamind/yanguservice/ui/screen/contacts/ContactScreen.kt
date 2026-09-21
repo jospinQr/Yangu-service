@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -26,6 +28,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
@@ -47,6 +50,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ContactScreen(
     onBack: () -> Unit,
+    onSendSelected: (List<Contact>) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ContactsViewModel = koinViewModel(),
 ) {
@@ -74,6 +78,12 @@ fun ContactScreen(
                 )
             )
         },
+        onToggleContact = viewModel::toggleContactSelection,
+        onToggleSelectAll = viewModel::toggleSelectAll,
+        onSendSelected = {
+            val contacts = viewModel.selectedContacts()
+            if (contacts.isNotEmpty()) onSendSelected(contacts)
+        },
         onClearError = viewModel::clearError,
         modifier = modifier,
     )
@@ -88,9 +98,15 @@ fun ContactScreenContent(
     onDismissAddSheet: () -> Unit,
     onAddContact: (name: String, phoneNumber: String) -> Unit,
     onPickVcf: () -> Unit,
+    onToggleContact: (String) -> Unit,
+    onToggleSelectAll: () -> Unit,
+    onSendSelected: () -> Unit,
     onClearError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectedCount = uiState.contacts.count { it.id in uiState.selectedContactIds }
+    val allSelected = uiState.contacts.isNotEmpty() && selectedCount == uiState.contacts.size
+
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -131,15 +147,38 @@ fun ContactScreenContent(
             }
         }
 
+        if (!uiState.isLoading && uiState.contacts.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "$selectedCount sur ${uiState.contacts.size} sélectionnés",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                TextButton(onClick = onToggleSelectAll) {
+                    Text(if (allSelected) "Tout désélectionner" else "Tout sélectionner")
+                }
+            }
+        }
+
         when {
             uiState.isLoading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
                     CircularProgressIndicator()
                 }
             }
 
             uiState.contacts.isEmpty() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(
                         "Aucun contact enregistré. Ajoutez votre premier contact.",
                         style = MaterialTheme.typography.bodyLarge,
@@ -148,12 +187,45 @@ fun ContactScreenContent(
             }
 
             else -> {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     items(uiState.contacts, key = Contact::id) { contact ->
+                        val selected = contact.id in uiState.selectedContactIds
                         ListItem(
+                            checked = selected,
+                            onCheckedChange = { onToggleContact(contact.id) },
+                            leadingContent = {
+                                Checkbox(checked = selected, onCheckedChange = null)
+                            },
                             supportingContent = { Text(contact.phoneNumber) },
                         ) { Text(contact.name) }
                         HorizontalDivider()
+                    }
+                }
+            }
+        }
+
+        if (!uiState.isLoading && uiState.contacts.isNotEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = 2.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        if (selectedCount == 0) "Sélectionnez des contacts pour leur écrire"
+                        else "$selectedCount destinataire(s) prêt(s) pour l'envoi",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Button(
+                        onClick = onSendSelected,
+                        enabled = selectedCount > 0,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Préparer le message")
                     }
                 }
             }
@@ -257,12 +329,16 @@ private fun ContactScreenPreview() {
             uiState = ContactsUiState(
                 contacts = listOf(Contact("1", "Alice Martin", "+33612345678")),
                 isLoading = false,
+                selectedContactIds = setOf("1"),
             ),
             onBack = {},
             onOpenAddSheet = {},
             onDismissAddSheet = {},
             onAddContact = { _, _ -> },
             onPickVcf = {},
+            onToggleContact = {},
+            onToggleSelectAll = {},
+            onSendSelected = {},
             onClearError = {},
         )
     }

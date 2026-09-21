@@ -23,12 +23,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +40,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
 import coil3.compose.AsyncImage
+import com.megamind.yanguservice.domain.model.Contact
 import com.megamind.yanguservice.ui.theme.YanguServiceTheme
 import com.megamind.yanguservice.utlis.BulkSendResult
 import org.koin.compose.viewmodel.koinViewModel
@@ -47,11 +52,16 @@ import org.koin.compose.viewmodel.koinViewModel
 fun SendMessageScreen(
     modifier: Modifier = Modifier,
     onOpenContacts: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    selectedContacts: List<Contact> = emptyList(),
     viewModel: SenderViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
+        viewModel.refreshApiTokenConfiguration()
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.refreshApiTokenConfiguration()
     }
 
@@ -63,6 +73,8 @@ fun SendMessageScreen(
         onCancel = viewModel::cancel,
         onClearError = viewModel::clearError,
         onOpenContacts = onOpenContacts,
+        onOpenSettings = onOpenSettings,
+        selectedContacts = selectedContacts,
         modifier = modifier
     )
 }
@@ -76,10 +88,14 @@ fun SendMessageScreenContent(
     onCancel: () -> Unit,
     onClearError: () -> Unit,
     onOpenContacts: () -> Unit,
+    onOpenSettings: () -> Unit,
+    selectedContacts: List<Contact> = emptyList(),
     modifier: Modifier = Modifier
 ) {
-    var message by remember { mutableStateOf("") }
-    var recipients by remember { mutableStateOf("") }
+    var message by rememberSaveable { mutableStateOf("") }
+    var recipients by rememberSaveable { mutableStateOf("") }
+    val phoneNumbers = (selectedContacts.map(Contact::phoneNumber) + recipients.toPhoneNumbers())
+        .distinct()
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -93,13 +109,77 @@ fun SendMessageScreenContent(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "Envoyer un message WhatsApp",
-            style = MaterialTheme.typography.headlineSmall
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (selectedContacts.isEmpty()) "Envoyer un message WhatsApp"
+                else "Préparer le message",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            TextButton(onClick = onOpenSettings, enabled = !uiState.isSending) {
+                Text("Paramètres")
+            }
+        }
 
-        OutlinedButton(onClick = onOpenContacts) {
-            Text("Voir les contacts")
+        if (selectedContacts.isEmpty()) {
+            OutlinedButton(onClick = onOpenContacts, enabled = !uiState.isSending) {
+                Text("Choisir des contacts")
+            }
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "${selectedContacts.size} contact(s) sélectionné(s)",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        TextButton(onClick = onOpenContacts, enabled = !uiState.isSending) {
+                            Text("Modifier")
+                        }
+                    }
+                    selectedContacts.take(3).forEach { contact ->
+                        Text(
+                            "${contact.name} · ${contact.phoneNumber}",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    if (selectedContacts.size > 3) {
+                        Text(
+                            "et ${selectedContacts.size - 3} autre(s)",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (!uiState.isApiTokenConfigured) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Configurez le token API pour pouvoir envoyer des messages")
+                    TextButton(onClick = onOpenSettings) { Text("Ouvrir les paramètres") }
+                }
+            }
         }
 
         OutlinedTextField(
@@ -110,12 +190,14 @@ fun SendMessageScreenContent(
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !uiState.isSending,
-            label = { Text("Destinataires") },
+            label = {
+                Text(if (selectedContacts.isEmpty()) "Destinataires" else "Numéros supplémentaires")
+            },
             supportingText = {
                 Text("Un numéro international par ligne, ou séparé par une virgule")
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            minLines = 2
+            minLines = if (selectedContacts.isEmpty()) 2 else 1
         )
 
         OutlinedTextField(
@@ -151,19 +233,25 @@ fun SendMessageScreenContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Button(
-                onClick = { onSend(message, recipients.toPhoneNumbers()) },
+                onClick = { onSend(message, phoneNumbers) },
                 enabled = !uiState.isSending &&
                     !uiState.isImageLoading &&
                     uiState.isApiTokenConfigured &&
-                    recipients.isNotBlank() &&
+                    phoneNumbers.isNotEmpty() &&
                     (message.isNotBlank() || uiState.selectedImageName != null),
                 modifier = Modifier.weight(1f)
             ) {
                 if (uiState.isSending) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text("Envoi en cours")
+                    }
                 } else {
                     Text("Envoyer")
                 }
@@ -174,6 +262,13 @@ fun SendMessageScreenContent(
                     Text("Annuler")
                 }
             }
+        }
+
+        if (phoneNumbers.size > 1 && !uiState.isSending) {
+            Text(
+                "${phoneNumbers.size} destinataires · envoi successif",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         uiState.error?.let { error ->
@@ -293,7 +388,8 @@ private fun SendMessageScreenPreview() {
             onSend = { _, _ -> },
             onCancel = {},
             onClearError = {},
-            onOpenContacts = {}
+            onOpenContacts = {},
+            onOpenSettings = {},
         )
     }
 }

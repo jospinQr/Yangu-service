@@ -23,6 +23,7 @@ data class ContactsUiState(
     val isSaving: Boolean = false,
     val isImporting: Boolean = false,
     val importResult: ContactImportResult? = null,
+    val selectedContactIds: Set<String> = emptySet(),
 )
 
 class ContactsViewModel(
@@ -44,9 +45,46 @@ class ContactsViewModel(
                     }
                 }
                 .collect { contacts ->
-                    _uiState.update { it.copy(contacts = contacts, isLoading = false) }
+                    val existingIds = contacts.mapTo(HashSet()) { it.id }
+                    _uiState.update {
+                        it.copy(
+                            contacts = contacts,
+                            selectedContactIds = it.selectedContactIds.intersect(existingIds),
+                            isLoading = false,
+                        )
+                    }
                 }
         }
+    }
+
+    fun toggleContactSelection(id: String) {
+        _uiState.update { state ->
+            if (state.contacts.none { it.id == id }) state
+            else state.copy(
+                selectedContactIds = if (id in state.selectedContactIds) {
+                    state.selectedContactIds - id
+                } else {
+                    state.selectedContactIds + id
+                },
+            )
+        }
+    }
+
+    fun toggleSelectAll() {
+        _uiState.update { state ->
+            val allIds = state.contacts.mapTo(HashSet()) { it.id }
+            state.copy(
+                selectedContactIds = if (state.selectedContactIds.containsAll(allIds)) {
+                    emptySet()
+                } else {
+                    allIds
+                },
+            )
+        }
+    }
+
+    fun selectedContacts(): List<Contact> = _uiState.value.let { state ->
+        state.contacts.filter { it.id in state.selectedContactIds }
     }
 
     fun openAddSheet() {

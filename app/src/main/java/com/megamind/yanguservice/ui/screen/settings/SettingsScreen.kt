@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +31,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SettingsScreen(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel()
 ) {
@@ -40,6 +42,7 @@ fun SettingsScreen(
         onSaveApiToken = viewModel::saveApiToken,
         onClearApiToken = viewModel::clearApiToken,
         onClearError = viewModel::clearError,
+        onBack = onBack,
         modifier = modifier
     )
 }
@@ -50,6 +53,7 @@ fun SettingsScreenContent(
     onSaveApiToken: (String) -> Unit,
     onClearApiToken: () -> Unit,
     onClearError: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var token by remember { mutableStateOf("") }
@@ -64,6 +68,9 @@ fun SettingsScreenContent(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        TextButton(onClick = onBack) {
+            Text("Retour")
+        }
         Text(
             text = "Paramètres",
             style = MaterialTheme.typography.headlineSmall
@@ -135,7 +142,8 @@ private fun SettingsScreenPreview() {
             uiState = SettingsUiState(),
             onSaveApiToken = {},
             onClearApiToken = {},
-            onClearError = {}
+            onClearError = {},
+            onBack = {},
         )
     }
 }

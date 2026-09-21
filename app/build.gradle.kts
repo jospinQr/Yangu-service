@@ -27,6 +27,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".codexpreview"
+        }
         release {
             optimization {
                 enable = false
@@ -72,13 +75,9 @@ dependencies {
     implementation(libs.koin.compose.viewmodel)
     implementation(libs.coil.compose)
 
-
-
-
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.lifecycle.viewmodel.nav3)
-
 
     //Room
     ksp(libs.androidx.room.compiler)

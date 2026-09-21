@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import java.net.UnknownHostException
 
 suspend inline fun <reified T> safeApiCall(
     crossinline block: suspend () -> HttpResponse
@@ -49,7 +50,12 @@ suspend inline fun <reified T> safeApiCall(
             "Erreur réseau réelle: ${exception.message ?: exception::class.java.simpleName}",
             exception
         )
-        Result.Error(NetworkException("Vérifiez votre connexion au serveur", exception))
+        val message = if (exception is UnknownHostException) {
+            "Impossible de résoudre l'adresse du serveur WasenderAPI. Vérifiez la connexion Internet et le DNS de cet appareil."
+        } else {
+            "Vérifiez votre connexion au serveur"
+        }
+        Result.Error(NetworkException(message, exception))
     } catch (exception: Exception) {
         Log.e(
             "WasenderApi",
