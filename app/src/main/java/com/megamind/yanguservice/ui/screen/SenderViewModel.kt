@@ -34,10 +34,10 @@ data class SenderUiState(
 
     fun canSend(): Boolean =
         isApiTokenConfigured &&
-            !isSending &&
-            !isImageLoading &&
-            phoneNumbers.isNotEmpty() &&
-            (message.isNotBlank() || selectedImageUri != null)
+                !isSending &&
+                !isImageLoading &&
+                phoneNumbers.isNotEmpty() &&
+                (message.isNotBlank() || selectedImageUri != null)
 }
 
 private fun String.toPhoneNumbers(): List<String> =
@@ -79,7 +79,24 @@ class SenderViewModel(
 
     fun setSelectedContacts(contacts: List<Contact>) {
         if (_uiState.value.isSending) return
-        _uiState.update { it.copy(selectedContacts = contacts.distinctBy(Contact::id), result = null, error = null) }
+        _uiState.update {
+            it.copy(
+                selectedContacts = contacts.distinctBy(Contact::id),
+                result = null,
+                error = null
+            )
+        }
+    }
+
+    fun removeContact(contact: Contact) {
+        if (_uiState.value.isSending) return
+        _uiState.update {
+            it.copy(
+                selectedContacts = it.selectedContacts.filterNot { selected -> selected.id == contact.id },
+                result = null,
+                error = null
+            )
+        }
     }
 
     fun selectImage(uri: String) {
@@ -145,6 +162,8 @@ class SenderViewModel(
             )
         }
     }
+
+
 
     fun sendToMany() {
         val state = _uiState.value

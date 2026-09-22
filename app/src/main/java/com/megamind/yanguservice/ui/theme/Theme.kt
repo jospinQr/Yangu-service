@@ -29,7 +29,6 @@ private val MonochromeColorScheme = lightColorScheme(
     inverseOnSurface = MonoWhite,
     error = MonoBlack,
     onError = MonoWhite,
-    errorContainer = MonoLightSurface,
     onErrorContainer = MonoBlack,
     outline = MonoBorder,
     outlineVariant = MonoSoftBorder,

@@ -4,11 +4,17 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -19,9 +25,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,6 +54,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.Lifecycle
 import coil3.compose.AsyncImage
 import com.megamind.yanguservice.R
+import com.megamind.yanguservice.domain.model.Contact
 import com.megamind.yanguservice.ui.component.MessagetextField
 import com.megamind.yanguservice.ui.theme.YanguServiceTheme
 import com.megamind.yanguservice.utlis.BulkSendResult
@@ -72,6 +82,7 @@ fun SendMessageScreen(
         onRecipientsChange = viewModel::updateRecipientsInput,
         onImageSelected = viewModel::selectImage,
         onRemoveImage = viewModel::removeImage,
+        onRemoveContact = viewModel::removeContact,
         onSend = viewModel::sendToMany,
         onCancel = viewModel::cancel,
         onOpenContacts = onOpenContacts,
@@ -86,6 +97,7 @@ fun SendMessageScreenContent(
     onMessageChange: (String) -> Unit,
     onRecipientsChange: (String) -> Unit,
     onImageSelected: (String) -> Unit,
+    onRemoveContact: (Contact) -> Unit,
     onRemoveImage: () -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit,
@@ -115,7 +127,8 @@ fun SendMessageScreenContent(
 
                         Icon(
                             painter = painterResource(R.drawable.outline_settings_24),
-                            contentDescription = "Paramètres"
+                            contentDescription = "Paramètres",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
@@ -162,9 +175,15 @@ fun SendMessageScreenContent(
 
                 if (selectedContacts.isNotEmpty()) {
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize(),
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainer
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        border = BorderStroke(
+                            width = .7.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -179,19 +198,60 @@ fun SendMessageScreenContent(
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleMedium
                                 )
-                                TextButton(onClick = onOpenContacts, enabled = !uiState.isSending) {
+                                TextButton(
+                                    onClick = onOpenContacts,
+                                    enabled = !uiState.isSending,
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                        containerColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
                                     Text("Modifier")
                                 }
                             }
-                            selectedContacts.take(3).forEach { contact ->
-                                Text(
-                                    "${contact.name} · ${contact.phoneNumber}",
-                                    style = MaterialTheme.typography.bodyMedium
+                            Column(
+                                modifier = Modifier.scrollable(
+                                    rememberScrollState(),
+                                    orientation = Orientation.Vertical
                                 )
+                            ) {
+
+                                selectedContacts.take(10).forEach { contact ->
+
+                                    ListItem(
+                                        modifier = Modifier,
+                                        leadingContent = {
+                                            Icon(
+                                                painter = painterResource(R.drawable.baseline_person_24),
+                                                contentDescription = null
+                                            )
+                                        },
+                                        trailingContent = {
+                                            IconButton(
+                                                onClick = { onRemoveContact(contact) },
+                                                enabled = !uiState.isSending
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.outline_close_small_24),
+                                                    contentDescription = "Retirer ${contact.name}"
+                                                )
+                                            }
+                                        },
+                                        overlineContent = null,
+                                        supportingContent = { Text(contact.phoneNumber) },
+                                        colors = ListItemDefaults.colors(),
+                                        elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+                                        content = { Text(contact.name) },
+                                        shapes = ListItemDefaults.shapes(shape = MaterialTheme.shapes.medium),
+                                    )
+                                    Spacer(modifier = Modifier.size(8.dp))
+
+                                }
                             }
-                            if (selectedContacts.size > 3) {
+
+                            if (selectedContacts.size > 10) {
                                 Text(
-                                    "et ${selectedContacts.size - 3} autre(s)",
+                                    "et ${selectedContacts.size - 10} autre(s)",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
@@ -208,10 +268,20 @@ fun SendMessageScreenContent(
                         Text(if (selectedContacts.isEmpty()) "Destinataires" else "Numéros supplémentaires")
                     },
                     supportingText = {
-                        Text("Un numéro international par ligne, ou séparé par une virgule")
+                        Text(
+                            "Un numéro international par ligne, ou séparé par une virgule",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    minLines = if (selectedContacts.isEmpty()) 2 else 1
+                    minLines = if (selectedContacts.isEmpty()) 2 else 1,
+                    shape = MaterialTheme.shapes.medium,
+                    leadingIcon = {
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_people_24),
+                            contentDescription = null
+                        )
+                    }
                 )
 
 
@@ -368,6 +438,7 @@ private fun SendMessageScreenPreview() {
             onMessageChange = {},
             onRecipientsChange = {},
             onImageSelected = {},
+            onRemoveContact = {},
             onRemoveImage = {},
             onSend = {},
             onCancel = {},

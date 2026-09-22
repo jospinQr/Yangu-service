@@ -43,12 +43,20 @@ class SenderViewModelDraftTest {
 
         viewModel.updateMessage("Bonjour Alice")
         viewModel.updateRecipientsInput("+33600000000")
-        viewModel.setSelectedContacts(listOf(Contact("alice", "Alice", "+33700000000")))
+        val alice = Contact("alice", "Alice", "+33700000000")
+        val bob = Contact("bob", "Bob", "+33800000000")
+        viewModel.setSelectedContacts(listOf(alice, bob))
 
         assertEquals("Bonjour Alice", viewModel.uiState.value.message)
         assertEquals("+33600000000", viewModel.uiState.value.recipientsInput)
-        assertEquals(listOf("+33700000000", "+33600000000"), viewModel.uiState.value.phoneNumbers)
+        assertEquals(listOf("+33700000000", "+33800000000", "+33600000000"), viewModel.uiState.value.phoneNumbers)
         assertTrue(viewModel.uiState.value.canSend())
+
+        viewModel.removeContact(alice)
+
+        assertEquals(listOf(bob), viewModel.uiState.value.selectedContacts)
+        assertEquals("Bonjour Alice", viewModel.uiState.value.message)
+        assertEquals(listOf("+33800000000", "+33600000000"), viewModel.uiState.value.phoneNumbers)
 
         viewModel.setSelectedContacts(emptyList())
 
