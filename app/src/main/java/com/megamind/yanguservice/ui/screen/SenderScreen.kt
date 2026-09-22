@@ -1,9 +1,13 @@
 package com.megamind.yanguservice.ui.screen
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -27,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -46,16 +51,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.Lifecycle
+import androidx.core.content.ContextCompat
 import coil3.compose.AsyncImage
 import com.megamind.yanguservice.R
 import com.megamind.yanguservice.domain.model.Contact
+import com.megamind.yanguservice.domain.model.SendChannel
 import com.megamind.yanguservice.ui.component.MessagetextField
+import com.megamind.yanguservice.ui.component.SingleChoiceButton
 import com.megamind.yanguservice.ui.theme.YanguServiceTheme
 import com.megamind.yanguservice.utlis.BulkSendResult
 import org.koin.compose.viewmodel.koinViewModel
@@ -68,6 +77,13 @@ fun SendMessageScreen(
     viewModel: SenderViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted && viewModel.uiState.value.channel == SendChannel.SMS) viewModel.sendToMany()
+        else if (!granted) viewModel.onSmsPermissionDenied()
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.refreshApiTokenConfiguration()
@@ -80,10 +96,20 @@ fun SendMessageScreen(
         uiState = uiState,
         onMessageChange = viewModel::updateMessage,
         onRecipientsChange = viewModel::updateRecipientsInput,
+        onChannelSelect = viewModel::selectChannel,
         onImageSelected = viewModel::selectImage,
         onRemoveImage = viewModel::removeImage,
         onRemoveContact = viewModel::removeContact,
-        onSend = viewModel::sendToMany,
+        onSend = {
+            if (uiState.channel == SendChannel.SMS &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+            } else {
+                viewModel.sendToMany()
+            }
+        },
         onCancel = viewModel::cancel,
         onOpenContacts = onOpenContacts,
         onOpenSettings = onOpenSettings,
@@ -96,6 +122,7 @@ fun SendMessageScreenContent(
     uiState: SenderUiState,
     onMessageChange: (String) -> Unit,
     onRecipientsChange: (String) -> Unit,
+    onChannelSelect: (SendChannel) -> Unit,
     onImageSelected: (String) -> Unit,
     onRemoveContact: (Contact) -> Unit,
     onRemoveImage: () -> Unit,
@@ -117,10 +144,15 @@ fun SendMessageScreenContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = if (selectedContacts.isEmpty()) "Envoyer un message WhatsApp"
-                        else "Préparer le message",
-                    )
+                    Row {
+                        Text("Envoyer un ")
+                        AnimatedContent(targetState = uiState.channel, label = "title") { channel ->
+                            Text(
+                                text = if (channel == SendChannel.WHATSAPP) "Whatssap"
+                                else "Sms",
+                            )
+                        }
+                    }
                 },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
@@ -160,7 +192,21 @@ fun SendMessageScreenContent(
             )
             {
 
-                if (!uiState.isApiTokenConfigured) {
+                SingleChoiceButton(
+                    selected = uiState.channel,
+                    onSelect = onChannelSelect,
+                    enabled = !uiState.isSending,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                AnimatedVisibility(uiState.channel == SendChannel.SMS) {
+                    Text(
+                        "Les SMS sont envoyés depuis votre carte SIM selon votre forfait.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                if (uiState.channel == SendChannel.WHATSAPP && !uiState.isApiTokenConfigured) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -331,7 +377,7 @@ fun BottomBarContent(
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (uiState.isImageLoading) {
+        if (uiState.channel == SendChannel.WHATSAPP && uiState.isImageLoading) {
             Row(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -341,37 +387,38 @@ fun BottomBarContent(
                 Text("Chargement de l’image…")
             }
         } else {
-            uiState.selectedImageUri?.let { imageUri ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
-                ) {
-                    Row(
-                        modifier = Modifier.padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            uiState.selectedImageUri?.takeIf { uiState.channel == SendChannel.WHATSAPP }
+                ?.let { imageUri ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer
                     ) {
-                        AsyncImage(
-                            model = Uri.parse(imageUri),
-                            contentDescription = "Aperçu de l’image sélectionnée",
-                            modifier = Modifier
-                                .size(88.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Text(
-                            text = uiState.selectedImageName ?: "Image sélectionnée",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 2
-                        )
-                        TextButton(onClick = onRemoveImage, enabled = !uiState.isSending) {
-                            Text("Retirer")
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = Uri.parse(imageUri),
+                                contentDescription = "Aperçu de l’image sélectionnée",
+                                modifier = Modifier
+                                    .size(88.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Text(
+                                text = uiState.selectedImageName ?: "Image sélectionnée",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2
+                            )
+                            TextButton(onClick = onRemoveImage, enabled = !uiState.isSending) {
+                                Text("Retirer")
+                            }
                         }
                     }
                 }
-            }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -379,6 +426,7 @@ fun BottomBarContent(
                 modifier = Modifier.weight(1f),
                 message = uiState.message,
                 enabled = !uiState.isSending,
+                showImageAction = uiState.channel == SendChannel.WHATSAPP,
                 onMessageChange = onMessageChange,
                 onTrailingAction = onChoseImage,
                 onLeadingAction = onOpenContacts
@@ -389,14 +437,15 @@ fun BottomBarContent(
                 enabled = uiState.canSend()
             ) {
                 if (uiState.isSending) {
-                    CircularProgressIndicator(
+                    CircularWavyProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
+                        color = MaterialTheme.colorScheme.primary
                     )
                 } else {
                     Icon(
                         painter = painterResource(R.drawable.baseline_send_24),
-                        contentDescription = "Envoyer"
+                        contentDescription = "Envoyer",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -437,6 +486,7 @@ private fun SendMessageScreenPreview() {
             uiState = SenderUiState(),
             onMessageChange = {},
             onRecipientsChange = {},
+            onChannelSelect = {},
             onImageSelected = {},
             onRemoveContact = {},
             onRemoveImage = {},

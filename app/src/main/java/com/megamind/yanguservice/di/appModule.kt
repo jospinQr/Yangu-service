@@ -5,6 +5,9 @@ import com.megamind.yanguservice.data.local.vcf.AndroidVcfContactReader
 import com.megamind.yanguservice.data.local.vcf.VcfParser
 import com.megamind.yanguservice.utlis.AndroidImageContentReader
 import com.megamind.yanguservice.data.repository.SenderRepositoryImpl
+import com.megamind.yanguservice.data.repository.SmsRepositoryImpl
+import com.megamind.yanguservice.data.telephony.AndroidSmsGateway
+import com.megamind.yanguservice.data.telephony.SmsGateway
 import com.megamind.yanguservice.data.security.AndroidKeystoreTokenStore
 import com.megamind.yanguservice.domain.repo.ContactRepository
 import com.megamind.yanguservice.domain.usecase.ImportVcfContacts
@@ -12,6 +15,8 @@ import com.megamind.yanguservice.domain.utils.VcfContactReader
 import com.megamind.yanguservice.domain.utils.AuthTokenStore
 import com.megamind.yanguservice.domain.utils.ImageContentReader
 import com.megamind.yanguservice.domain.repo.SenderRepository
+import com.megamind.yanguservice.domain.repo.SmsRepository
+import com.megamind.yanguservice.domain.usecase.SendMessages
 import com.megamind.yanguservice.ui.screen.SenderViewModel
 import com.megamind.yanguservice.ui.screen.contacts.ContactsViewModel
 import com.megamind.yanguservice.ui.screen.settings.SettingsViewModel
@@ -26,6 +31,9 @@ val appModule = module {
     single<CoroutineDispatcher>(named("io")) { Dispatchers.IO }
     single<AuthTokenStore> { AndroidKeystoreTokenStore(get(), get(named("io"))) }
     single<SenderRepository> { SenderRepositoryImpl(get(), get(named("io"))) }
+    single<SmsGateway> { AndroidSmsGateway(get()) }
+    single<SmsRepository> { SmsRepositoryImpl(get(), get(named("io"))) }
+    single { SendMessages(get(), get()) }
     single<ImageContentReader> { AndroidImageContentReader(get(), get(named("io"))) }
     single<ContactRepository> { ContactRepositoryImpl(get(), get()) }
     single { VcfParser() }

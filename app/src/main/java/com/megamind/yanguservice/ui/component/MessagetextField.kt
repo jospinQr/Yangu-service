@@ -1,5 +1,6 @@
 package com.megamind.yanguservice.ui.component
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +19,7 @@ fun MessagetextField(
     modifier: Modifier = Modifier,
     message: String,
     enabled: Boolean = true,
+    showImageAction: Boolean = true,
     onMessageChange: (String) -> Unit,
     onTrailingAction: () -> Unit,
     onLeadingAction: () -> Unit,
@@ -40,15 +42,18 @@ fun MessagetextField(
             unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent,
         ),
-        trailingIcon = {
-
-            IconButton(onClick = onTrailingAction, enabled = enabled) {
-                Icon(
-                    painter = painterResource(R.drawable.baseline_image_24),
-                    contentDescription = "Pièce jointe"
-                )
+        trailingIcon = if (showImageAction) {
+            {
+                AnimatedVisibility(showImageAction) {
+                    IconButton(onClick = onTrailingAction, enabled = enabled) {
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_image_24),
+                            contentDescription = "Pièce jointe"
+                        )
+                    }
+                }
             }
-        },
+        } else null,
         leadingIcon = {
 
             IconButton(onClick = onLeadingAction, enabled = enabled) {

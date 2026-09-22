@@ -3,6 +3,7 @@ package com.megamind.yanguservice.data.repository
 import android.util.Log
 import com.megamind.yanguservice.data.remote.WasenderSevice
 import com.megamind.yanguservice.domain.utils.ImageAttachment
+import com.megamind.yanguservice.domain.utils.normalizeRecipientPhoneNumber
 import com.megamind.yanguservice.domain.repo.SenderRepository
 import com.megamind.yanguservice.utlis.BulkSendResult
 import com.megamind.yanguservice.utlis.Result
@@ -19,7 +20,7 @@ class SenderRepositoryImpl(
 
     override suspend fun sendMessage(message: String, phoneNumber: String): Result<String> =
         withContext(dispatcher) {
-            val number = normalize(phoneNumber)
+            val number = normalizeRecipientPhoneNumber(phoneNumber)
                 ?: return@withContext IllegalArgumentException(
                     "Numéro invalide : $phoneNumber"
                 ).let { error ->
@@ -111,7 +112,7 @@ class SenderRepositoryImpl(
         val invalid = linkedMapOf<String, Throwable>()
 
         phoneNumbers.forEach { rawNumber ->
-            val normalized = normalize(rawNumber)
+            val normalized = normalizeRecipientPhoneNumber(rawNumber)
             if (normalized == null) {
                 val error = IllegalArgumentException("Numéro invalide : $rawNumber")
                 logFailure("Validation du destinataire", rawNumber, error)
@@ -122,11 +123,6 @@ class SenderRepositoryImpl(
         }
 
         return PreparedRecipients(valid.toList(), invalid)
-    }
-
-    private fun normalize(raw: String): String? {
-        val cleaned = raw.filter { it.isDigit() || it == '+' }
-        return if (Regex("^\\+\\d{8,15}$").matches(cleaned)) cleaned else null
     }
 
     private fun logFailure(operation: String, recipient: String?, error: Throwable?) {

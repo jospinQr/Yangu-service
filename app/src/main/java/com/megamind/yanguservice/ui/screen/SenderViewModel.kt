@@ -3,10 +3,11 @@ package com.megamind.yanguservice.ui.screen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamind.yanguservice.domain.model.Contact
+import com.megamind.yanguservice.domain.model.SendChannel
 import com.megamind.yanguservice.domain.utils.AuthTokenStore
 import com.megamind.yanguservice.domain.utils.ImageAttachment
 import com.megamind.yanguservice.domain.utils.ImageContentReader
-import com.megamind.yanguservice.domain.repo.SenderRepository
+import com.megamind.yanguservice.domain.usecase.SendMessages
 import com.megamind.yanguservice.utlis.BulkSendResult
 import com.megamind.yanguservice.utlis.Result
 import kotlinx.coroutines.CancellationException
@@ -20,6 +21,7 @@ data class SenderUiState(
     val message: String = "",
     val recipientsInput: String = "",
     val selectedContacts: List<Contact> = emptyList(),
+    val channel: SendChannel = SendChannel.WHATSAPP,
     val isApiTokenConfigured: Boolean = false,
     val isSending: Boolean = false,
     val isImageLoading: Boolean = false,
@@ -33,11 +35,11 @@ data class SenderUiState(
             .distinct()
 
     fun canSend(): Boolean =
-        isApiTokenConfigured &&
-                !isSending &&
-                !isImageLoading &&
-                phoneNumbers.isNotEmpty() &&
-                (message.isNotBlank() || selectedImageUri != null)
+        (channel == SendChannel.SMS || isApiTokenConfigured) &&
+            !isSending &&
+            (channel == SendChannel.SMS || !isImageLoading) &&
+            phoneNumbers.isNotEmpty() &&
+            (message.isNotBlank() || (channel == SendChannel.WHATSAPP && selectedImageUri != null))
 }
 
 private fun String.toPhoneNumbers(): List<String> =
@@ -46,7 +48,7 @@ private fun String.toPhoneNumbers(): List<String> =
         .filter(String::isNotEmpty)
 
 class SenderViewModel(
-    private val repository: SenderRepository,
+    private val sendMessages: SendMessages,
     private val imageContentReader: ImageContentReader,
     private val authTokenStore: AuthTokenStore
 ) : ViewModel() {
@@ -75,6 +77,15 @@ class SenderViewModel(
     fun updateRecipientsInput(recipientsInput: String) {
         if (_uiState.value.isSending) return
         _uiState.update { it.copy(recipientsInput = recipientsInput, result = null, error = null) }
+    }
+
+    fun selectChannel(channel: SendChannel) {
+        if (_uiState.value.isSending) return
+        _uiState.update { it.copy(channel = channel, result = null, error = null) }
+    }
+
+    fun onSmsPermissionDenied() {
+        _uiState.update { it.copy(error = "Autorisez l'envoi de SMS pour utiliser ce mode") }
     }
 
     fun setSelectedContacts(contacts: List<Contact>) {
@@ -167,8 +178,8 @@ class SenderViewModel(
 
     fun sendToMany() {
         val state = _uiState.value
-        if (state.isSending || state.isImageLoading) return
-        if (!state.isApiTokenConfigured) {
+        if (state.isSending || (state.channel == SendChannel.WHATSAPP && state.isImageLoading)) return
+        if (state.channel == SendChannel.WHATSAPP && !state.isApiTokenConfigured) {
             _uiState.update { it.copy(error = "Configurez d'abord le token API") }
             return
         }
@@ -177,17 +188,25 @@ class SenderViewModel(
             _uiState.update { it.copy(error = "Ajoutez au moins un destinataire") }
             return
         }
-        if (state.message.isBlank() && selectedImage == null) {
-            _uiState.update { it.copy(error = "Ajoutez un message ou une image") }
+        if (state.message.isBlank() && (state.channel == SendChannel.SMS || selectedImage == null)) {
+            _uiState.update {
+                it.copy(
+                    error = if (state.channel == SendChannel.SMS) "Ajoutez un message SMS"
+                    else "Ajoutez un message ou une image"
+                )
+            }
             return
         }
 
         _uiState.update { it.copy(isSending = true, result = null, error = null) }
         sendJob = viewModelScope.launch {
             try {
-                val result = selectedImage?.let { image ->
-                    repository.sendImageToMany(state.message.trim(), phoneNumbers, image)
-                } ?: repository.sendToMany(state.message.trim(), phoneNumbers)
+                val result = sendMessages(
+                    state.channel,
+                    state.message.trim(),
+                    phoneNumbers,
+                    if (state.channel == SendChannel.WHATSAPP) selectedImage else null
+                )
 
                 _uiState.update { it.copy(isSending = false, result = result) }
             } catch (exception: CancellationException) {

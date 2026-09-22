@@ -1,7 +1,10 @@
 package com.megamind.yanguservice.ui.screen
 
 import com.megamind.yanguservice.domain.model.Contact
+import com.megamind.yanguservice.domain.model.SendChannel
 import com.megamind.yanguservice.domain.repo.SenderRepository
+import com.megamind.yanguservice.domain.repo.SmsRepository
+import com.megamind.yanguservice.domain.usecase.SendMessages
 import com.megamind.yanguservice.domain.utils.AuthTokenStore
 import com.megamind.yanguservice.domain.utils.ImageAttachment
 import com.megamind.yanguservice.domain.utils.ImageContentReader
@@ -15,7 +18,7 @@ class SenderViewModelDraftTest {
     @Test
     fun choosingAndRemovingContactsKeepsTheDraft() {
         val viewModel = SenderViewModel(
-            repository = object : SenderRepository {
+            sendMessages = SendMessages(object : SenderRepository {
                 override suspend fun sendMessage(message: String, phoneNumber: String): Result<String> =
                     error("Unexpected send")
 
@@ -27,7 +30,10 @@ class SenderViewModelDraftTest {
                     phoneNumbers: List<String>,
                     image: ImageAttachment
                 ): BulkSendResult = error("Unexpected send")
-            },
+            }, object : SmsRepository {
+                override suspend fun sendToMany(message: String, phoneNumbers: List<String>): BulkSendResult =
+                    error("Unexpected SMS send")
+            }),
             imageContentReader = object : ImageContentReader {
                 override suspend fun read(uri: String): Result<ImageAttachment> =
                     error("Unexpected image read")
@@ -62,5 +68,17 @@ class SenderViewModelDraftTest {
 
         assertEquals("Bonjour Alice", viewModel.uiState.value.message)
         assertEquals(listOf("+33600000000"), viewModel.uiState.value.phoneNumbers)
+    }
+
+    @Test
+    fun smsRequiresTextButNotWhatsAppToken() {
+        val withText = SenderUiState(
+            channel = SendChannel.SMS,
+            message = "Bonjour",
+            recipientsInput = "+33612345678"
+        )
+        assertTrue(withText.canSend())
+        assertTrue(!withText.copy(message = "", selectedImageUri = "content://image").canSend())
+        assertTrue(!withText.copy(channel = SendChannel.WHATSAPP).canSend())
     }
 }
