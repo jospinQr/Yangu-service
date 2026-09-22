@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,10 +52,14 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ContactScreen(
     onBack: () -> Unit,
     onSendSelected: (List<Contact>) -> Unit,
+    initialSelectedContactIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
     viewModel: ContactsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel, initialSelectedContactIds) {
+        viewModel.setSelectedContactIds(initialSelectedContactIds)
+    }
     val vcfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.importVcf(it.toString()) }
     }
@@ -81,10 +86,10 @@ fun ContactScreen(
         onToggleContact = viewModel::toggleContactSelection,
         onToggleSelectAll = viewModel::toggleSelectAll,
         onSendSelected = {
-            val contacts = viewModel.selectedContacts()
-            if (contacts.isNotEmpty()) onSendSelected(contacts)
+            onSendSelected(viewModel.selectedContacts())
         },
         onClearError = viewModel::clearError,
+        allowEmptySelection = initialSelectedContactIds.isNotEmpty(),
         modifier = modifier,
     )
 }
@@ -102,6 +107,7 @@ fun ContactScreenContent(
     onToggleSelectAll: () -> Unit,
     onSendSelected: () -> Unit,
     onClearError: () -> Unit,
+    allowEmptySelection: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val selectedCount = uiState.contacts.count { it.id in uiState.selectedContactIds }
@@ -143,7 +149,7 @@ fun ContactScreenContent(
 
         if (!uiState.isAddSheetOpen) {
             uiState.error?.let { error ->
-                Text(error, color = MaterialTheme.colorScheme.error)
+                Text("Erreur : $error", color = MaterialTheme.colorScheme.error)
             }
         }
 
@@ -216,16 +222,17 @@ fun ContactScreenContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        if (selectedCount == 0) "Sélectionnez des contacts pour leur écrire"
+                        if (selectedCount == 0 && allowEmptySelection) "Aucun contact sélectionné"
+                        else if (selectedCount == 0) "Sélectionnez des contacts pour leur écrire"
                         else "$selectedCount destinataire(s) prêt(s) pour l'envoi",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Button(
                         onClick = onSendSelected,
-                        enabled = selectedCount > 0,
+                        enabled = selectedCount > 0 || allowEmptySelection,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Préparer le message")
+                        Text(if (selectedCount == 0) "Retirer les contacts" else "Utiliser ces contacts")
                     }
                 }
             }
@@ -300,7 +307,7 @@ private fun AddContactSheetContent(
         )
 
         error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
+            Text("Erreur : $it", color = MaterialTheme.colorScheme.error)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

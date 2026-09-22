@@ -2,6 +2,7 @@ package com.megamind.yanguservice.ui.screen
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamind.yanguservice.domain.model.Contact
 import com.megamind.yanguservice.domain.utils.AuthTokenStore
 import com.megamind.yanguservice.domain.utils.ImageAttachment
 import com.megamind.yanguservice.domain.utils.ImageContentReader
@@ -16,6 +17,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SenderUiState(
+    val message: String = "",
+    val recipientsInput: String = "",
+    val selectedContacts: List<Contact> = emptyList(),
     val isApiTokenConfigured: Boolean = false,
     val isSending: Boolean = false,
     val isImageLoading: Boolean = false,
@@ -23,7 +27,23 @@ data class SenderUiState(
     val selectedImageName: String? = null,
     val result: BulkSendResult? = null,
     val error: String? = null
-)
+) {
+    val phoneNumbers: List<String>
+        get() = (selectedContacts.map(Contact::phoneNumber) + recipientsInput.toPhoneNumbers())
+            .distinct()
+
+    fun canSend(): Boolean =
+        isApiTokenConfigured &&
+            !isSending &&
+            !isImageLoading &&
+            phoneNumbers.isNotEmpty() &&
+            (message.isNotBlank() || selectedImageUri != null)
+}
+
+private fun String.toPhoneNumbers(): List<String> =
+    split(Regex("[,;\\n]+"))
+        .map(String::trim)
+        .filter(String::isNotEmpty)
 
 class SenderViewModel(
     private val repository: SenderRepository,
@@ -47,22 +67,36 @@ class SenderViewModel(
         }
     }
 
+    fun updateMessage(message: String) {
+        if (_uiState.value.isSending) return
+        _uiState.update { it.copy(message = message, result = null, error = null) }
+    }
+
+    fun updateRecipientsInput(recipientsInput: String) {
+        if (_uiState.value.isSending) return
+        _uiState.update { it.copy(recipientsInput = recipientsInput, result = null, error = null) }
+    }
+
+    fun setSelectedContacts(contacts: List<Contact>) {
+        if (_uiState.value.isSending) return
+        _uiState.update { it.copy(selectedContacts = contacts.distinctBy(Contact::id), result = null, error = null) }
+    }
+
     fun selectImage(uri: String) {
         if (_uiState.value.isSending) return
 
         imageLoadJob?.cancel()
         selectedImage = null
+        _uiState.update {
+            it.copy(
+                isImageLoading = true,
+                selectedImageUri = null,
+                selectedImageName = null,
+                result = null,
+                error = null
+            )
+        }
         imageLoadJob = viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isImageLoading = true,
-                    selectedImageUri = null,
-                    selectedImageName = null,
-                    result = null,
-                    error = null
-                )
-            }
-
             when (val result = imageContentReader.read(uri)) {
                 is Result.Success -> {
                     val image = result.data
@@ -112,27 +146,29 @@ class SenderViewModel(
         }
     }
 
-    fun sendToMany(message: String, phoneNumbers: List<String>) {
-        if (_uiState.value.isSending || _uiState.value.isImageLoading) return
-        if (!_uiState.value.isApiTokenConfigured) {
+    fun sendToMany() {
+        val state = _uiState.value
+        if (state.isSending || state.isImageLoading) return
+        if (!state.isApiTokenConfigured) {
             _uiState.update { it.copy(error = "Configurez d'abord le token API") }
             return
         }
+        val phoneNumbers = state.phoneNumbers
         if (phoneNumbers.isEmpty()) {
             _uiState.update { it.copy(error = "Ajoutez au moins un destinataire") }
             return
         }
-        if (message.isBlank() && selectedImage == null) {
+        if (state.message.isBlank() && selectedImage == null) {
             _uiState.update { it.copy(error = "Ajoutez un message ou une image") }
             return
         }
 
+        _uiState.update { it.copy(isSending = true, result = null, error = null) }
         sendJob = viewModelScope.launch {
-            _uiState.update { it.copy(isSending = true, result = null, error = null) }
             try {
                 val result = selectedImage?.let { image ->
-                    repository.sendImageToMany(message.trim(), phoneNumbers, image)
-                } ?: repository.sendToMany(message.trim(), phoneNumbers)
+                    repository.sendImageToMany(state.message.trim(), phoneNumbers, image)
+                } ?: repository.sendToMany(state.message.trim(), phoneNumbers)
 
                 _uiState.update { it.copy(isSending = false, result = result) }
             } catch (exception: CancellationException) {

@@ -126,7 +126,7 @@ fun SettingsScreenContent(
 
         uiState.error?.let { error ->
             Text(
-                text = error,
+                text = "Erreur : $error",
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )

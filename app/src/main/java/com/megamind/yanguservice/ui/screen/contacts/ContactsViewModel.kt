@@ -70,6 +70,14 @@ class ContactsViewModel(
         }
     }
 
+    fun setSelectedContactIds(ids: Set<String>) {
+        _uiState.update { state ->
+            val selectedIds = if (state.isLoading) ids
+                else ids.intersect(state.contacts.mapTo(HashSet()) { it.id })
+            state.copy(selectedContactIds = selectedIds)
+        }
+    }
+
     fun toggleSelectAll() {
         _uiState.update { state ->
             val allIds = state.contacts.mapTo(HashSet()) { it.id }

@@ -1,58 +1,65 @@
 package com.megamind.yanguservice.ui.theme
 
-import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+private val MonochromeColorScheme = lightColorScheme(
+    primary = MonoBlack,
+    onPrimary = MonoWhite,
+    primaryContainer = MonoLightSurface,
+    onPrimaryContainer = MonoBlack,
+    inversePrimary = MonoWhite,
+    secondary = MonoBlack,
+    onSecondary = MonoWhite,
+    secondaryContainer = MonoLightSurface,
+    onSecondaryContainer = MonoBlack,
+    tertiary = MonoBlack,
+    onTertiary = MonoWhite,
+    tertiaryContainer = MonoLightSurface,
+    onTertiaryContainer = MonoBlack,
+    background = MonoWhite,
+    onBackground = MonoBlack,
+    surface = MonoWhite,
+    onSurface = MonoBlack,
+    surfaceVariant = MonoSurface,
+    onSurfaceVariant = MonoCharcoal,
+    surfaceTint = MonoBlack,
+    inverseSurface = MonoBlack,
+    inverseOnSurface = MonoWhite,
+    error = MonoBlack,
+    onError = MonoWhite,
+    errorContainer = MonoLightSurface,
+    onErrorContainer = MonoBlack,
+    outline = MonoBorder,
+    outlineVariant = MonoSoftBorder,
+    scrim = MonoBlack,
+    surfaceBright = MonoWhite,
+    surfaceDim = MonoMediumSurface,
+    surfaceContainerLowest = MonoWhite,
+    surfaceContainerLow = MonoAlmostWhite,
+    surfaceContainer = MonoSurface,
+    surfaceContainerHigh = MonoLightSurface,
+    surfaceContainerHighest = MonoMediumSurface,
+    primaryFixed = MonoLightSurface,
+    primaryFixedDim = MonoMediumSurface,
+    onPrimaryFixed = MonoBlack,
+    onPrimaryFixedVariant = MonoCharcoal,
+    secondaryFixed = MonoLightSurface,
+    secondaryFixedDim = MonoMediumSurface,
+    onSecondaryFixed = MonoBlack,
+    onSecondaryFixedVariant = MonoCharcoal,
+    tertiaryFixed = MonoLightSurface,
+    tertiaryFixedDim = MonoMediumSurface,
+    onTertiaryFixed = MonoBlack,
+    onTertiaryFixedVariant = MonoCharcoal,
 )
 
 @Composable
-fun YanguServiceTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
-) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+fun YanguServiceTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = MonochromeColorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }
